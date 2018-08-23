@@ -114,11 +114,13 @@ func disk(rate float64) {
     }
 }
 
-func net(conc int) {
+func net(conc int, rate float64) {
     for i := 0; i < conc; i++ {
         go func() {
             for {
                 _,_ = http.Get("http://noiseserver.q:80/static/10MB.zip")
+                // Sleep (rate control)
+                time.Sleep(time.Nanosecond * time.Duration(round(1000000000/rate)))
             }
         }()
     }
@@ -166,7 +168,13 @@ func main() {
     }
 
     // Should be number of concurrent downloads
-    netRate, err := strconv.Atoi(os.Getenv("NET"))
+    netConc, err := strconv.Atoi(os.Getenv("NETCONC"))
+    if err != nil {
+        log.Fatal("Unable to parse NET conc.")
+    }
+
+    // Should be downloads per minute (range: float64 >0 to 1000000000)
+    netRate, err := strconv.ParseFloat(os.Getenv("NETRATE"), 64)
     if err != nil {
         log.Fatal("Unable to parse NET rate.")
     }
@@ -185,8 +193,9 @@ func main() {
         go disk(diskRate)
     }
 
-    if netRate > 0 {
-        go net(netRate)
+    // Need both netRate and netConc
+    if netRate > 0 && netConc > 0 {
+        go net(netConc, netRate)
     }
 
     // Wait forever
